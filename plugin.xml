@@ -55,6 +55,8 @@
     <source-file src="src/ios/NSString+SSURLEncoding.m"/>
     <header-file src="src/ios/SocialSharing.h"/>
     <source-file src="src/ios/SocialSharing.m"/>
+    <header-file src="src/ios/TNShareItem.h"/>
+    <source-file src="src/ios/TNShareItem.m"/>
 
     <framework src="Social.framework" weak="true" />
     <framework src="MessageUI.framework" weak="true" />

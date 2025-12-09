@@ -1,5 +1,6 @@
 #import "SocialSharing.h"
 #import "NSString+SSURLEncoding.h"
+#import "TNShareItem.h"
 #import <Cordova/CDV.h>
 #import <Social/Social.h>
 #import <Foundation/NSException.h>
@@ -91,8 +92,17 @@ static NSString *const kShareOptionIPadCoordinates = @"iPadCoordinates";
 
     NSMutableArray *activityItems = [[NSMutableArray alloc] init];
 
-    if (message != (id)[NSNull null] && message != nil) {
-    [activityItems addObject:message];
+    UIImage *previewImage = [self getAppIconImage];
+    TNShareItem *shareItem = [[TNShareItem alloc] initWithText:message urlString:urlString previewImage:previewImage];
+    BOOL hasMessage = (message != (id)[NSNull null] && message != nil);
+    BOOL hasUrl = (urlString != (id)[NSNull null] && urlString != nil && [urlString length] > 0);
+    BOOL hasPreview = previewImage != nil;
+    if (hasMessage || hasUrl || hasPreview) {
+      [activityItems addObject:shareItem];
+    }
+
+    if (hasMessage) {
+      [activityItems addObject:message];
     }
 
     if (filenames != (id)[NSNull null] && filenames != nil && filenames.count > 0) {
@@ -109,13 +119,16 @@ static NSString *const kShareOptionIPadCoordinates = @"iPadCoordinates";
       [activityItems addObjectsFromArray:files];
     }
 
-    if (urlString != (id)[NSNull null] && urlString != nil) {
-        [activityItems addObject:[NSURL URLWithString:[urlString SSURLEncodedString]]];
+    NSURL *shareUrl = [TNShareItem urlFromString:urlString];
+    if (shareUrl != nil) {
+      [activityItems addObject:shareUrl];
     }
 
-    UIActivity *activity = [[UIActivity alloc] init];
-    NSArray *applicationActivities = [[NSArray alloc] initWithObjects:activity, nil];
-    UIActivityViewController *activityVC = [[UIActivityViewController alloc] initWithActivityItems:activityItems applicationActivities:applicationActivities];
+    if ([activityItems count] == 0) {
+      [activityItems addObject:@""];
+    }
+
+    UIActivityViewController *activityVC = [[UIActivityViewController alloc] initWithActivityItems:activityItems applicationActivities:nil];
     if (subject != (id)[NSNull null] && subject != nil) {
       [activityVC setValue:subject forKey:@"subject"];
     }
@@ -720,6 +733,71 @@ static NSString *const kShareOptionIPadCoordinates = @"iPadCoordinates";
     CDVPluginResult * pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
     [self.commandDelegate sendPluginResult:pluginResult callbackId:self.command.callbackId];
   }
+}
+
+- (UIImage *)getAppIconImage {
+  NSDictionary *infoPlist = [[NSBundle mainBundle] infoDictionary];
+  NSArray *iconFiles = [infoPlist valueForKeyPath:@"CFBundleIcons.CFBundlePrimaryIcon.CFBundleIconFiles"];
+
+  if (iconFiles == nil || [iconFiles count] == 0) {
+    iconFiles = [infoPlist valueForKeyPath:@"CFBundleIcons~ipad.CFBundlePrimaryIcon.CFBundleIconFiles"];
+  }
+
+  // Сначала пробуем системные иконки из Info.plist (в обратном порядке, чтобы взять самую крупную)
+  for (NSString *iconName in [iconFiles reverseObjectEnumerator]) {
+    UIImage *icon = [self loadIconImageWithName:iconName];
+    if (icon != nil) {
+      return icon;
+    }
+  }
+
+  NSArray<NSString *> *pngIcons = [[NSBundle mainBundle] pathsForResourcesOfType:@"png" inDirectory:nil];
+  for (NSString *path in pngIcons) {
+    if ([path containsString:@"AppIcon"] || [path.lastPathComponent hasPrefix:@"Icon"] || [path.lastPathComponent hasPrefix:@"appicon"]) {
+      UIImage *icon = [UIImage imageWithContentsOfFile:path];
+      if (icon != nil) {
+        return icon;
+      }
+    }
+  }
+
+  NSArray<NSString *> *jpgIcons = [[NSBundle mainBundle] pathsForResourcesOfType:@"jpg" inDirectory:nil];
+  for (NSString *path in jpgIcons) {
+    if ([path containsString:@"AppIcon"] || [path.lastPathComponent hasPrefix:@"Icon"] || [path.lastPathComponent hasPrefix:@"appicon"]) {
+      UIImage *icon = [UIImage imageWithContentsOfFile:path];
+      if (icon != nil) {
+        return icon;
+      }
+    }
+  }
+
+  return nil;
+}
+
+- (UIImage *)loadIconImageWithName:(NSString *)iconName {
+  if (iconName == (id)[NSNull null] || iconName == nil) {
+    return nil;
+  }
+
+  UIImage *icon = [UIImage imageNamed:iconName];
+  if (icon != nil) {
+    return icon;
+  }
+
+  NSString *iconWithPng = [iconName hasSuffix:@".png"] ? iconName : [iconName stringByAppendingString:@".png"];
+  NSString *pngPath = [[NSBundle mainBundle] pathForResource:[iconWithPng stringByDeletingPathExtension] ofType:[iconWithPng pathExtension]];
+  if (pngPath != nil) {
+    icon = [UIImage imageWithContentsOfFile:pngPath];
+  }
+
+  if (icon == nil) {
+    NSString *jpgPath = [[NSBundle mainBundle] pathForResource:[iconName stringByDeletingPathExtension] ofType:@"jpg"];
+    if (jpgPath != nil) {
+      icon = [UIImage imageWithContentsOfFile:jpgPath];
+    }
+  }
+
+  return icon;
 }
 
 -(UIImage*)getImage: (NSString *)imageName {
