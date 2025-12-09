@@ -743,7 +743,6 @@ static NSString *const kShareOptionIPadCoordinates = @"iPadCoordinates";
     iconFiles = [infoPlist valueForKeyPath:@"CFBundleIcons~ipad.CFBundlePrimaryIcon.CFBundleIconFiles"];
   }
 
-  // Сначала пробуем системные иконки из Info.plist (в обратном порядке, чтобы взять самую крупную)
   for (NSString *iconName in [iconFiles reverseObjectEnumerator]) {
     UIImage *icon = [self loadIconImageWithName:iconName];
     if (icon != nil) {
